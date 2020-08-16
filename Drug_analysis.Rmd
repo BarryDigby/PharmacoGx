@@ -1,0 +1,112 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    highlight: zenburn
+    theme: flatly
+---
+
+# LNCaP RNA-Seq Drug Analysis
+*Marvin Lim, Barry Digby, Dr. Pilib O'Broin, Prof. Stephen Finn*
+
+# Feature Selection for PharmacoGx
+The PharmacoGx package can be used to query the Connectivity Map (CMap) database by using gene expression signatures that represent different biological states, establishing small molecule drug connections among these signatures based on their gene expression patterns. The main challenge of this analysis lies in the large number of differentially expressed (DE) genes returned by DESeq2 which serves as our input gene signature, as there are no suggestions on how many genes to use as input for PharmacoGx. 
+
+In order to select the optimal number of genes to use as input for PharmacoGx, a filtering strategy was devised along with an iterative process to assess the highest connectivity score returned by each iteration. The filtering strategy firstly selected genes with a Log 2 Fold Change of +/- 2, returning genes with an absolute expression difference above 1 between biological conditions. The second filtering step calculated the quartile range of mean expression value of each gene remaining after filtering step 1. Mean expression values below Q2 were excluded from the analysis. This step removed lowly expressed genes from the analysis with the reasoning that highly expressed DE genes are more likely to represent a true biological effect in the condition of interest. Finally, the genes were ranked according to their statistical significance for input to PharmacoGx. 
+
+Following rigorous filtering steps, iterations using the top n filtered genes (increased in steps of 50 [and 10 for clone9 vs control]) were used as inputs for PharmacoGx. To assess the performance of the iteration process, the maximum and minimum connectivity score is plotted for each iteration (see plots below). For the analysis, the highest connectivity score is of interest. Per the Broad Institues definition of connectivity scores:
+
+> A high positive connectivity score indicates that the corresponding perturbagen induced the expression of the query signature. A high negative connectivity score indicates that the corresponding perturbagen reversed the expression of the query signature.
+
+Due to the fact that the LNCaP cell lines were treated with Enzalutamide, positive connectivity scores indicate perturbagens capable of elicitng similar gene expression patterns as enzalutamide and thus represent potential alernative agonistic therapuetic strategies. Negative connectivity scores represent perturbagens capable of reversing the effect of enzalutamide and thus represent antagonistic mechanisms. 
+
+```{R, message  = F}
+library(knitr)
+library(DT)
+library(ggplot2)
+```
+
+# Iteration Results{.tabset}
+
+## Clone1 vs Control
+```{r}
+c1_max <- read.table("~/Desktop/PharmacoGx/Clone1_vs_Control_permutations.txt", header=T)
+c1_min <- read.table("~/Desktop/PharmacoGx/Clone1_vs_Control_premutations_min.txt", header = T)
+c1_plot <- rbind(c1_max, c1_min)
+c1_plot <- c1_plot[,c(1,2)]
+c1_plot$group <- c(rep("positive", 24), rep("negative", 24))
+
+p1 <- ggplot(c1_plot, aes(x=iteration, y=Connectivity_max, group=group)) +
+      geom_line(aes(color=group)) +
+      geom_point(aes(color=group)) + 
+      labs(title = "Clone1 vs Control Iterations",
+           y = "Connectivity Score",
+           x = ~italic("n")~ " Genes") +
+      scale_color_brewer(palette = "Dark2") +
+      theme_bw() + geom_vline(xintercept = 300, colour = "red3", linetype="dashed")
+      
+  p1 + theme(legend.position = "none")
+```
+
+## Clone1 vs Clone9
+```{R}
+c19_max <- read.table("~/Desktop/PharmacoGx/Clone1_vs_Clone9_permutations.txt", header=T)
+c19_min <- read.table("~/Desktop/PharmacoGx/Clone1_vs_Clone9_permutations_min.txt", header = T)
+c19_plot <- rbind(c19_max, c19_min)
+c19_plot <- c19_plot[,c(1,2)]
+c19_plot$group <- c(rep("positive", 22), rep("negative", 22))
+
+p19 <- ggplot(c19_plot, aes(x=iteration, y=Connectivity_max, group=group)) +
+      geom_line(aes(color=group)) +
+      geom_point(aes(color=group)) + 
+      labs(title = "Clone1 vs Clone9 Iterations",
+           y = "Connectivity Score",
+           x = ~italic("n")~ " Genes") +
+      scale_color_brewer(palette = "Dark2") +
+      theme_bw() + geom_vline(xintercept = 100, colour = "red3", linetype="dashed")
+      
+p19 + theme(legend.position = "none")
+```
+
+## Clone9 vs Control
+```{R}
+c9_max <- read.table("~/Desktop/PharmacoGx/Clone9_vs_Control_permutations.txt", header=T)
+c9_min <- read.table("~/Desktop/PharmacoGx/Clone9_vs_Control_permutation_min.txt", header = T)
+c9_plot <- rbind(c9_max, c9_min)
+c9_plot <- c9_plot[,c(1,2)]
+c9_plot$group <- c(rep("positive", 5), rep("negative", 5))
+
+p9 <- ggplot(c9_plot, aes(x=iteration, y=Connectivity_max, group=group)) +
+      geom_line(aes(color=group)) +
+      geom_point(aes(color=group)) + 
+      labs(title = "Clone9 vs Control Iterations",
+           y = "Connectivity Score",
+           x = ~italic("n")~ " Genes") +
+      scale_color_brewer(palette = "Dark2") +
+      theme_bw() + geom_vline(xintercept = 100, colour = "red3", linetype="dashed")
+      
+p9 + theme(legend.position = "none")
+```
+
+# CMap Results{.tabset}
+Connectivity scores below 0.9 & -0.9 represent weak connections. The analysis returned weak associations with perturbagens, however consistent with both Clone1 vs Control and Clone1 vs Clone9, AH-6809 a prostaglandin DP-receptor blocking drug was returned as the top hit indicating it can elicit a similar gene expression response. 
+
+## Clone1 vs Control
+```{R}
+c1_res <- read.table("~/Desktop/PharmacoGx/results/Clone1_vs_Control_n300.txt", header = T)
+DT::datatable(c1_res, rownames = T)
+```
+
+## Clone1 vs Clone9
+```{r}
+c19_res <- read.table("~/Desktop/PharmacoGx/results/Clone1_vs_Clone9_n100.txt", header = T)
+DT::datatable(c19_res, rownames = T)
+```
+
+## Clone9 vs Control
+```{R}
+c9_res <- read.table("~/Desktop/PharmacoGx/results/Clone9_vs_Control_n110", header = T)
+DT::datatable(c9_res, rownames = T)
+```
